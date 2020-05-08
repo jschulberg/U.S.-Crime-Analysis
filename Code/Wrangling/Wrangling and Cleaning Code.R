@@ -10,12 +10,6 @@
 # and modeling techniques to do so, including, but not limited to:
 
 #   -- Outlier Detection
-#   -- Principal Component Analysis (PCA)
-#   -- Outlier Detection
-#   -- Outlier Detection
-#   -- Outlier Detection
-#   -- Outlier Detection
-#   -- Outlier Detection
 
 
 #######################################################################
