@@ -111,7 +111,7 @@ p_vals_df$p_vals <- as.double(p_vals_df$p_vals)
 
 # Save our visualization to the correct working directory
 setwd("C:/Users/jschulberg/Documents/Data Analytics Blog/Blog 3 - US Crime/us-crime-analysis/Viz/")
-jpeg(file = "U.S. Crime Linear Regression") # Name of the file for the viz we'll save
+jpeg(file = "U.S. Crime Linear Regression.jpeg") # Name of the file for the viz we'll save
 
 # Visualization time
 ggplot(p_vals_df,
@@ -127,7 +127,7 @@ ggplot(p_vals_df,
   labs(title = "P-Values for Different Predictors in the U.S. Crime Dataset",
        subtitle = "*The dashed line shows which p-values are above or below the threshold of .05") +
   # format our title and subtitle
-  theme(plot.title = element_text(hjust = 0, color = "black"),
+  theme(plot.title = element_text(hjust = 0, color = "black"), 
         plot.subtitle = element_text(color = "dark gray", size = 10)) +
   # let's create a gray dashed, drop-line at .05 so we can see which variables are under our threshold
   geom_hline(yintercept = .05, linetype = "dashed", color = "light gray", size = .75) +
