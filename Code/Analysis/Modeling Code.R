@@ -9,13 +9,8 @@
 # data folder of this repository. I will use a variety of exploratory
 # and modeling techniques to do so, including, but not limited to:
 
-#   -- Outlier Detection 
-#   -- Principal Component Analysis (PCA)
-#   -- Outlier Detection
-#   -- Outlier Detection
-#   -- Outlier Detection
-#   -- Outlier Detection
-#   -- Outlier Detection
+#   -- Linear Regression 
+#   -- Principal Component Analysis (PCA) + Lin. Reg.
 
 
 #######################################################################
