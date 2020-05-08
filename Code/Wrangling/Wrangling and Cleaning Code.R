@@ -90,7 +90,7 @@ ggplot(data_crime, aes(y = Crime)) +
   # I thought the boxplot was too thick, so let's make it a little skinnier
   scale_x_discrete(limits=c("-.1", ".1"))
 
-# Allow us to write other visualizations later on
+# Allow us to write other visualizations later on 
 dev.off()
 
 # Now that we have a clear idea of what the outliers could look like, let's use the grubbs.test to

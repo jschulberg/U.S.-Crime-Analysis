@@ -9,7 +9,7 @@ This repository includes analysis to predict the crime rates across 50 states us
   - Other methods  
   
 The repository is organized as follows:  
-### Code  
+### Code   
 This section includes all of the R code used on the U.S. Crime dataset. It has two main sub-folders:  
   #### Wrangling  
   This folder includes all of the data wrangling code.  
