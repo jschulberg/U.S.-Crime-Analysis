@@ -26,7 +26,9 @@ suppressMessages(library("factoextra")) # Used for PCA
 suppressMessages(library("rpart")) # Used for Decision Trees
 suppressMessages(library("rpart.plot")) # Used for Decision Trees
 suppressMessages(library("randomForest")) # Used for Random Forest
-
+suppressMessages(library("glmnet")) # Used for various regression techniques
+suppressMessages(library("caret")) # Used for general modeling, although I'm not a huge fan
+suppressMessages(library("MASS")) # Used for variable selection
 
 # Bring in the data, delimited by a tab ("\t")
 data_crime <- read.delim(here::here("Data/uscrime.txt"), header = T)
@@ -522,4 +524,206 @@ dev.off()
  # 2. Po2 (per capita expenditure on police protection in 1959)  
  # 3. Wealth (median value of transferable assets or family income) 
 
+
+#######################################################################
+# Variable Selection --------------------------------------------------
+#######################################################################
+# In this section, I'll attempt multiple methods for narrowing down
+# our dataset by selecting the most important variables. As I narrow
+# down the dataset, I'll compare different linear regression models to
+# see if our accuracy improves.
+
+## Stepwise Regression  
+# First we'll find the full linear regression model and then run Stepwise Regression, 
+# in which we'll slowly pick apart the full model by slicing out negligible coefficients.
+
+# Using the linear regression model we created earlier, fit a stepwise regression model
+step_mod <- stepAIC(model_lm1, direction = "both", trace = FALSE)
+
+summary(step_mod)
+# This puts our R-squared value around 74% and p-value close to 0
+
+# Next we'll use the caret package -- specifically the leaps and the MASS packages 
+# to fit our linear regression model using stepwise selection (leapSeq).
+# Set up repeated 10-fold cross-validation, which will let us estimate the 
+# RMSE (average prediction error) for each of the 5 models specified by nvmax
+train_control <- trainControl(method = "cv", number = 10)
+# Train the model
+step_mod <- train(Crime ~ ., data = data_crime,
+                    method = "leapSeq", # stepwise selection
+                    tuneGrid = data.frame(nvmax = 1:5), # maximum number of predictors to be incorporated in the model. This will search the best 5-variable models for us
+                    trControl = train_control
+                    )
+
+step_mod$results
+# The output above shows different metrics and their standard deviation for 
+# comparing the accuracy of the 5 best models.
+cat("We can see that an nvmax of", step_mod$bestTune[[1]], "is the best model with an RMSE of", step_mod$results$RMSE[[which.min(step_mod$results$RMSE)]])
+
+
+# save our stepwise regression model results in a dataframe
+step_res <- step_mod$results
+step_res$RMSE <- round(step_res$RMSE, 3)
+
+jpeg(filename = "U.S. Crime Stepwise Regression AMSE.jpeg")
+
+# Visualization time
+ggplot(step_res,
+       # order by importance
+       aes(x = reorder(nvmax, -RMSE), y = RMSE, group = 1)) +
+  # Let's make it a column graph and change the color
+geom_col(fill = "slateblue2") +
+  # Add the text labels in for p-values so it's easier to read
+  geom_text(label = step_res$RMSE, size = 5, hjust = 1.1, color = "white") +
+  # Change the theme to classic
+  theme_classic() +
+  # Let's change the names of the axes and title
+  xlab("Number of Predictors to Include") +
+  ylab("Average Mean Squared Error") +
+  labs(title = "Average Mean Squared Error for Different Predictors",
+       subtitle = "This analysis uses Stepwise Regression by\nleveraging the leaps and MASS packages") +
+  # format our title and subtitle
+  theme(plot.title = element_text(hjust = 0, color = "black"),
+        plot.subtitle = element_text(color = "dark gray", size = 10)) +
+  # flip the axes and fix the axis
+  coord_flip()
+
+dev.off()
+
+
+# Our final model and coefficients are:
+summary(step_mod$finalModel)
+coef(step_mod$finalModel, 3)
+
+
+# An asterisk indicates that a given variable is going to be included in our final model. 
+# For example, since we got the lowest RMSE of 
+step_mod$results$RMSE[[which.min(step_mod$results$RMSE)]]
+# value with 
+step_mod$results$nvmax[[which.min(step_mod$results$RMSE)]]
+# predictors, we are going to include:
+  
+# 1. Ed (mean years of schooling of the population aged 25 years or over)  
+# 2. Po1 (per capita expenditure on police protection in 1960)  
+# 3. Ineq (income inequality: percentage of families earning below half the median income)  
+
+# Thus our final model becomes:  
+cat("Crime = ", coef(step_mod$finalModel, 3)[1], "+ (Ed x ", coef(step_mod$finalModel, 3)[2], ") + (Po1 x ", coef(step_mod$finalModel, 3)[3], ") + (Ineq x ", coef(step_mod$finalModel, 3)[4], ")", sep = "")
+  
+  
+  
+## Lasso and Elastic-Net Regression  
+# After doing some research, I found that both variable selection methods use the same glmnet() functions. 
+# The only difference is an input parameter, denoted 'alpha', which differs between the two. So we'll just 
+# look at them simultaneously, along with a number of other variations of alpha values.
+
+# Super annoying but glmnet prefers data.matrix instead of as.matrix
+x <- data.matrix(data_scaled_fix[, -16])
+y <- data.matrix(data_scaled_fix[, 16])
+
+# Let's loop through a bunch of alpha values from 0 to 1, sequenced on a .1 basis
+a_vals <- seq(0, 1, .1)
+
+# Initialize an empty list to hold all of our models
+alphafit_i <- list()
+
+# Initialize an empty dataframe to hold all of our final values
+full_df <- data.frame()
+
+# Build the lasso regression and test our outputs for all the alpha values from .1 to 1
+for (i in a_vals) {
+  # Next we'll run the cv.glmnet function on our different alpha values
+  alphafit_i <- cv.glmnet(x, y, type.measure = "mse", alpha = i, nfolds = 5, family = "gaussian")
+  # Find each alpha value's lambda.1se, which is the largest value of lambda such that error is within 1 standard error of the        minimum.
+  lam_i <- alphafit_i$lambda.1se
+  # Run our predictions. Note that s probably refers to the size of the penalty we are setting
+  prediction <- predict(alphafit_i, s = lam_i, newx = x)
+  # Get our mean squared error
+  mse <- mean((y - prediction)^2)
+  # Create a temporary, new data frame
+  temp_df <- data.frame(a_vals = i, mse = mse)
+  # Recursively build our data frame
+  full_df <- rbind(full_df, temp_df)
+}
+print(full_df)
+
+
+# round our mean squared errors
+full_df$mse <- round(full_df$mse, 5)
+
+jpeg("U.S. Crime Different Variable Selection Errors.jpeg")
+
+# Visualization time
+ggplot(full_df,
+       # order by mean squared error
+       aes(x = reorder(a_vals, -mse), y = mse, group = 1)) +
+  # Let's make it a column graph and change the color
+  geom_col(fill = "slateblue2") +
+  # Add the text labels in for mse-values so it's easier to read
+  geom_label(label = full_df$mse, size = 3, hjust = 0, color = "black") +
+  # Change the theme to classic
+  theme_classic() +
+  # Let's change the names of the axes and title
+  xlab("Alpha Values") +
+  ylab("Mean Squared Error") +
+  labs(title = "Mean Squared Error of Different Alpha Values",
+       subtitle = "Alpha = 0 means Ridge Regression\nAlpha = .5 means Elastic-Net\nAlpha = 1 means Lasso Regression") +
+  # format our title and subtitle
+  theme(plot.title = element_text(hjust = 0, color = "black"),
+        plot.subtitle = element_text(color = "dark gray", size = 10)) +
+  # flip the axes and fix the axis
+  coord_flip()
+
+dev.off()
+cat("From above, we can see that an alpha value of ", full_df$a_vals[which.min(full_df$mse)], " produces our lowest Mean Squared Error of ", full_df$mse[which.min(full_df$mse)], ".", sep = "")  
+
+## Find our Model  
+# Now that we know which alpha value gives us the lowest Mean Squared Error, we'll pull that 
+# model out and treat that as our linear regression model.
+
+# Store our min alpha value as a variable
+min_alpha <- full_df$a_vals[which.min(full_df$mse)]
+# Next we'll run the cv.glmnet function on our optimal alpha value of .1
+alphafit_optimal <- cv.glmnet(x, y, type.measure = "mse", alpha = min_alpha, nfolds = 5, family = "gaussian")
+# Find the alpha value's lambda.1se, which is the largest value of lambda such that error is within 1 standard error of the     minimum.
+(lambda <- alphafit_optimal$lambda.1se)
+# Run our prediction on our model. Note that s probably refers to the size of the penalty we are setting
+(prediction <- predict(alphafit_optimal, s = lambda, newx = x))
+# Get our mean squared error
+(mse <- mean((y - prediction)^2))
+
+
+# Now that we have our glmnet conducted, we'll figure out which coefficients we need so we can 
+# build out our linear regression model.
+
+# Find the coefficients that are most important
+(coefs <- coef(alphafit_optimal, s = lambda))
+
+# With these coefficients, we'll rebuild our linear model.
+
+# Reorder our crime data to match the correct order of columns
+reordered_crime <- data_crime %>%
+  dplyr::select(So, everything())
+
+# Pull out the variables of interest
+col_of_interest <- as.vector(summary(coefs)[i]-1)
+
+# Note that the first variable in this vector is the intercept, so let's remove that
+col_of_interest1 <- col_of_interest[-1, ]
+
+# build our data frame with the proper variables
+new_crime <- reordered_crime[, col_of_interest1]
+
+# Bring the crime variable back in
+new_crime <- new_crime %>%
+  cbind(Crime = data_crime$Crime)
+
+# run the linear regression model
+final_model <- lm(Crime ~ ., data = new_crime)
+
+summary(final_model)
+
+# We can see that our Adjusted R-squared value is 66%. Not all of the coefficients 
+# seem to have low p-values, and are thus not significant, so I would suggest taking more of a 
+# manual approach to sifting through the data and selecting variables.
 
