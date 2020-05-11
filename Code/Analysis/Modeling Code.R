@@ -111,7 +111,7 @@ p_vals_df <- p_vals_df[-1, ]
 p_vals_df$p_vals <- as.double(p_vals_df$p_vals)
 
 # Save our visualization to the correct working directory
-setwd("C:/Users/jschulberg/Documents/Data Analytics Blog/Blog 3 - US Crime/us-crime-analysis/Viz/")
+setwd("C:/Users/jschulberg/Documents/Data Analytics Blog/Blog 3 - US Crime/U.S. Crime Analysis/Viz/")
 jpeg(file = "U.S. Crime Linear Regression.jpeg") # Name of the file for the viz we'll save
 
 # Visualization time
