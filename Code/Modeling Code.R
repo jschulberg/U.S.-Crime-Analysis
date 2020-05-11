@@ -73,7 +73,7 @@ data_scaled <- as_tibble(scale(data_crime[, c(1, 3:16)]))
 # bring column 2 back in and reorder our columns
 data_scaled <- data_scaled %>%
   cbind(data_crime[, 2]) %>%
-  select(Crime, everything())
+  dplyr::select(Crime, everything())
 
 # Before we build our first Linear Regression model, let's set our seed to ensure randomness
 set.seed(123)
@@ -156,7 +156,7 @@ summary(model_lm2)
 # We see from this model that our R-squared value dropped significantly. Very strange, and not what I expected.
 # Let's try bringing in the two variables that were just above the .05 threshold (U@ and Po1).
 
-data_updated <- cbind(data_signif, U2 = data_scaled$U2, Po1 = data_scaled$Po1)
+data_updated <- cbind(data_signif, Po1 = data_scaled$Po1)
 
 model_lm3 <- lm(Crime ~., data_updated)
 
@@ -218,7 +218,7 @@ median(data_crime$Crime)
 # Start by getting rid of the Crime column for now since we won't perform
 # PCA on the one column we are aiming to predict.
 base_data <- data_crime %>%
-  select(-Crime)
+  dplyr::select(-Crime)
 
 head(base_data)
 
@@ -416,7 +416,7 @@ data_scaled_facs <- as.data.frame(as.factor(unlist(data_crime[, 2])))
 # bring column 2 back in and reorder our columns
 data_scaled_fix <- data_scaled %>%
   cbind(data_scaled_facs) %>%
-  select(Crime, everything()) %>%
+  dplyr::select(Crime, everything()) %>%
   rename("S0" = "as.factor(unlist(data_crime[, 2]))") %>%
   as_tibble()
 
