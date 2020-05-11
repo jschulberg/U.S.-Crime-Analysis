@@ -386,12 +386,31 @@ new_pca <- data.frame(predict(pca1, new_data))
 fviz_add(ind_plot, new_pca, color ="red")
 
 # Predict what the crime rate would now be by leveraging the new data that's had PCA applied
-(pred <- predict(mod1, newdata = new_pca))
+(pred <- predict(pca1, newdata = new_pca))
 
 # Thus we predict that the crime rate in the new state would be 1248 crimes per 100,000 population. This seems
 # within the range of reason for our data, especially given that the mean of our crime data is:
-mean(data$Crime)
+mean(data_crime$Crime)
 # and the range goes from 
-range(data$Crime)[1] 
+range(data_crime$Crime)[1] 
 # to
-range(data$Crime)[2]
+range(data_crime$Crime)[2]
+
+
+#######################################################################
+# Decision Trees ------------------------------------------------------
+#######################################################################
+# In this section, I'll find the best model available using:
+#   - Regression Trees
+#   - Random Forest
+
+# Change column 2 to be a factor
+data_scaled_facs <- as.data.frame(as.factor(unlist(crime_data[, 2])))
+
+# bring column 2 back in and reorder our columns
+data_scaled_fix <- data_scaled %>%
+  cbind("S0" = data_scaled_facs) %>%
+  select(Crime, everything()) %>%
+  as_tibble()
+
+head(data_scaled)
