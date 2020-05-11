@@ -23,9 +23,13 @@ suppressMessages(library("ggplot2")) # Used for visualizations
 suppressMessages(library("readxl")) # Used for loading excel files
 suppressMessages(library("readr")) # Used for working with files
 suppressMessages(library("factoextra")) # Used for PCA 
+suppressMessages(library("rpart")) # Used for Decision Trees
+suppressMessages(library("rpart.plot")) # Used for Decision Trees
+suppressMessages(library("randomForest")) # Used for Random Forest
+
 
 # Bring in the data, delimited by a tab ("\t")
-data_crime <- read.delim("Data/uscrime.txt", header = T)
+data_crime <- read.delim(here::here("Data/uscrime.txt"), header = T)
 
 # Convert to a tibble, my preferred data structure
 data_crime <- as_tibble(data_crime)
@@ -214,10 +218,13 @@ median(data_crime$Crime)
 base_data <- data_crime %>%
   select(-Crime)
 
-# Because we'll need this to unscale our data later on, let's track the means 
-# and standard deviations of each variable
+head(base_data)
+
+# Because we'll need this to unscale our data later on, let's track the means and standard deviations
+# of each variable
 mu <- sapply(base_data, mean)
 std_devs <- sapply(base_data, sd)
+
 
 # Before we continue, let's set our seed to ensure randomness
 set.seed(123)
@@ -226,10 +233,9 @@ set.seed(123)
 options(scipen = 999)
 
 # Run our first Principle Component Analysis using the prcomp() function which uses 
-# Singular value decomposition (SVD), which examines the covariances / correlations 
-# between individual observations. Note: We won't scale the data within the function 
-# because we already scaled it earlier.
-pca1 <- prcomp(base_data, scale. = T)
+# Singular value decomposition (SVD), which examines the covariances / correlations between individual observations.
+# Note: We won't scale the data within the function because we already scaled it earlier.
+(pca1 <- prcomp(base_data, scale. = T))
 
 summary(pca1)
 # We can see that, from our Cumulative Proportion dimension, the first six principle components explain about 90% of the 
@@ -237,9 +243,12 @@ summary(pca1)
 
 # Create a graph of the individual observations. Individual states with a similar profile of factors will be grouped.
 (ind_plot <- fviz_pca_ind(pca1,
-                          col.ind = "slateblue2", # Shade the viz by the quality of representation
-                          repel = T, # Avoid text overlapping
-                          alpha.ind = .8 # Add some transparency to better show overlayed points
+                          # Shade the viz by the quality of representation
+                          col.ind = "slateblue2", 
+                          # Avoid text overlapping
+                          repel = T,
+                          # Add some transparency so it's easier to see points overlayed on top of each other
+                          alpha.ind = .5
 )
 )
 
@@ -267,7 +276,7 @@ pca_cum_var <- pca_eig_val %>%
 pca_cum_var$dimension <- as.factor(substr(pca_cum_var$dimension, 5, length(pca_cum_var$dimension)))
 
 
-jpeg(file = "U.S. Crime PCA Variation") # Name of the file for the viz we'll save
+jpeg(file = "U.S. Crime PCA Variation.jpeg") # Name of the file for the viz we'll save
 
 # Viz time
 ggplot(pca_cum_var, aes(x = dimension)) +
@@ -281,7 +290,7 @@ ggplot(pca_cum_var, aes(x = dimension)) +
   scale_x_discrete(limits = pca_cum_var$dimension) +
   theme_classic() +
   # Let's change the names of the axes and title
-  labs(title = "Variation explained by the dimensions\nin our dataset",
+  labs(title = "Variation explained by the dimensions in our dataset",
        subtitle = "This uses the method of Principle Component Analysis",
        y = "Variance (%)",
        x = "Dimension") +
@@ -289,14 +298,9 @@ ggplot(pca_cum_var, aes(x = dimension)) +
   theme(plot.title = element_text(hjust = 0, color = "slateblue4", size = 14),
         plot.subtitle = element_text(color = "dark gray", size = 10))
 
-# In this visualization, we can see that the first 6 dimensions explain about 90% of the
-# variance in our dataset, so we'll opt to keep these.
+dev.off()
 
-
-
-########################################################################
-# Linear Regression w/ PCA ---------------------------------------------
-######################################################################## 
+## Predict
 # Now we'll bring our crime data (our dependent variable) back in and see how our predictions are using the principle
 # components. First, let's limit our data to just the first six principle components, based on
 # our analysis above.
@@ -305,21 +309,21 @@ pca_len <- 6
 pca_vals <- pca1$x[, 1:pca_len]
 
 pca_vals <- pca_vals %>%
-  cbind(Crime = data_crime$Crime) %>%
+  cbind(Crime = data$Crime) %>%
   as_tibble()
 
-model_pca <- lm(Crime ~ ., data = pca_vals)
+mod1 <- lm(Crime ~ ., data = pca_vals)
 
-summary(model_pca)
+summary(mod1)
 # Notice that our adjusted R-squared value is 60.7%. This is significantly lower than what we saw in the previous homework (somewhere 
 # around 75-80%), but we've significantly reduced the number of variables we're using.
 
 ### Transform our data back
 # Get the original intercept from our model
-(b0 <- model_pca$coefficients[1])
+(b0 <- mod1$coefficients[1])
 
 # Pull out model coefficients so we can make the Beta vector
-(b_vals <- model_pca$coefficients[2:(pca_len + 1)])
+(b_vals <- mod1$coefficients[2:(pca_len + 1)])
 
 # To get our data re-transformed, we'll have to multiply the coefficients by our rotated matrix, A to create alpha vector
 # Note: The "%*%" operator enables us to perform matrix multiplication.
@@ -354,8 +358,7 @@ summary(estimates)
 # These are not exact, because our PCA model really only explains about 90% of the variation within our dataset.
 
 ## Predict
-# Now, let's predict on this fake dataset below.
-# First we'll store all the new data we've been provided into a data frame.
+# Now, let's predict on the dataset we've been provided. First we'll store all the new data we've been provided into a data frame.
 M = 14.0
 So = 0
 Ed = 10.0
@@ -386,15 +389,16 @@ new_pca <- data.frame(predict(pca1, new_data))
 fviz_add(ind_plot, new_pca, color ="red")
 
 # Predict what the crime rate would now be by leveraging the new data that's had PCA applied
-(pred <- predict(pca1, newdata = new_pca))
+(pred <- predict(mod1, newdata = new_pca))
 
 # Thus we predict that the crime rate in the new state would be 1248 crimes per 100,000 population. This seems
 # within the range of reason for our data, especially given that the mean of our crime data is:
-mean(data_crime$Crime)
+mean(data$Crime)
 # and the range goes from 
-range(data_crime$Crime)[1] 
+range(data$Crime)[1] 
 # to
-range(data_crime$Crime)[2]
+range(data$Crime)[2]
+
 
 
 #######################################################################
@@ -405,12 +409,117 @@ range(data_crime$Crime)[2]
 #   - Random Forest
 
 # Change column 2 to be a factor
-data_scaled_facs <- as.data.frame(as.factor(unlist(crime_data[, 2])))
+data_scaled_facs <- as.data.frame(as.factor(unlist(data_crime[, 2])))
 
 # bring column 2 back in and reorder our columns
 data_scaled_fix <- data_scaled %>%
-  cbind("S0" = data_scaled_facs) %>%
+  cbind(data_scaled_facs) %>%
   select(Crime, everything()) %>%
+  rename("S0" = "as.factor(unlist(data_crime[, 2]))") %>%
   as_tibble()
 
-head(data_scaled)
+#######################  
+## Regression Tree  
+#######################
+# Recursive partitioning is a fundamental tool in data mining. It helps us explore the 
+# stucture of a set of data, while developing easy to visualize decision rules for predicting 
+# a categorical (classification tree) or continuous (regression tree) outcome.  
+# Our formula	below will be in the format outcome ~ ., which allows us to predict on all of our variables.  
+
+# Grow our tree using the rpart function from the rpart package to create our regression tree
+reg_tree <- rpart(Crime ~ ., 
+                  data = data_scaled_fix, # specifies the data frame (we'll use our scaled data so everything's on equal footing)  
+                  method = "anova") # "anova" for a regression tree*
+# control=	optional parameters for controlling tree growth. For example, 
+# control = rpart.control(minsplit=30, cp=0.001) requires that the minimum number 
+# of observations in a node be 30 before attempting a split and that a split must 
+# decrease the overall lack of reg_tree by a factor of 0.001 (cost complexity factor) 
+# before being attempted.
+summary(reg_tree)
+
+# Immediately, we see that our four most important variables in this tree model are:  
+#  1. Po1 (per capita expenditure on police protection in 1960)  
+#  2. Po2 (per capita expenditure on police protection in 1959)  
+#  3. Wealth (median value of transferable assets or family income)  
+#  4. Ineq (percentage of families earning below half the median income)    
+ 
+   
+ # display complexity parameter table
+(cp <- reg_tree$cptable)
+plotcp(reg_tree)	
+
+# Notice from the graph of the relative errors, that our best split occurs when cp = 4, 
+# which is where the lowest cross valiadation error occurs. This means that the optimal 
+# number of splits for our tree is 4. This value occurs at cp = 
+cp[which.min(cp[, 3]), 1]
+
+# plot approximate R-squared and relative error for different splits (2 plots).
+rsq.rpart(reg_tree)	
+
+# Plot the regression tree
+jpeg(filename = "U.S. Crime Decision Tree.jpeg")
+
+prp(reg_tree)
+dev.off()
+
+# From the visualization of the regression tree above, we can see that Po1 is the most 
+# significant variable (which aligns with the output of our rpart() function), and then Pop and 
+# NW are the next most important. After that, not many of the variables are that important for our purposes.  
+
+
+
+#######################  
+## Random Forest  
+#######################
+# Now we'll compare our results to those we get from running a Random Forest model. The Random Forest model 
+# will make 500 decision trees and "vote" on the nodes that work best (i.e. provide the highest accuracy).
+rf_mod <- randomForest(Crime ~ ., data = data_scaled_fix)
+
+print(rf_mod)
+
+# Here we note that the mean of the squared residuals is 
+last(rf_mod$mse)
+# The Random Forest algorithm we ran explains about 56.7% of the variation in our data, which is not great.  
+
+# Which variables were the most important according to the Random Forest algorithm?
+# Start by bringing everything together into one data frame and rename the columns
+rf_imprtnce <- cbind(row.names(rf_mod$importance), rf_mod$importance)
+colnames(rf_imprtnce) <- c("Variable", "Importance")
+rf_imprtnce <- as_tibble(rf_imprtnce)
+
+# make the importance variable a numeric and round it
+rf_imprtnce$Importance <- as.numeric(rf_imprtnce$Importance)
+rf_imprtnce$Importance <- round(rf_imprtnce$Importance, 2)
+
+
+jpeg(file = "U.S. Crime Random Forest.jpeg") # Name of the file for the viz we'll save
+
+# Visualization time
+ggplot(rf_imprtnce,
+       # order by importance
+       aes(x = reorder(Variable, Importance), y = Importance, group = 1)) +
+  # Let's make it a column graph and change the color
+  geom_col(fill = "slateblue2") +
+  # Add the text labels in for p-values so it's easier to read
+  geom_label(label = rf_imprtnce$Importance, size = 3, hjust = 0, color = "black") +
+  # Change the theme to classic
+  theme_classic() +
+  # Let's change the names of the axes and title
+  xlab("Variables") +
+  ylab("Importance") +
+  labs(title = "Importance of Different Variables\nin Random Forest Algorithm",
+       subtitle = "The dataset used is the Crime dataset") +
+  # format our title and subtitle
+  theme(plot.title = element_text(hjust = 0, color = "black"),
+        plot.subtitle = element_text(color = "dark gray", size = 10)) +
+  # flip the axes and fix the axis
+  coord_flip()
+
+dev.off()
+# It's interesting to note here that the three most important variables for the Random Forest 
+# algorithm are similar to the three we found in the Regression Tree earlier:  
+ # 1. Po1 (per capita expenditure on police protection in 1960)  
+ # 2. Po2 (per capita expenditure on police protection in 1959)  
+ # 3. Wealth (median value of transferable assets or family income) 
+
+
