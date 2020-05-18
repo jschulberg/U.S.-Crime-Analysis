@@ -11,6 +11,9 @@
 
 #   -- Linear Regression 
 #   -- Principal Component Analysis (PCA) + Lin. Reg.
+#   -- Regression Trees
+#   -- Random Forest
+#   -- Variable Selection
 
 
 #######################################################################
