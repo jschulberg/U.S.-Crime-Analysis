@@ -420,7 +420,7 @@ orig_b0 <- b0 - sum(rota_matr * mu / std_devs)
 #   "Hold on. Something seems wrong."
 # }
 
-estimates <- as.matrix(data[, 1:15]) %*% orig_coefs + orig_b0
+estimates <- as.matrix(data_crime[, 1:15]) %*% orig_coefs + orig_b0
 
 summary(estimates)
 ```
