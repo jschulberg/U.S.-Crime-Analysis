@@ -2,21 +2,25 @@
 title: "U.S. Crime Analysis"
 author: "Justin Schulberg"
 date: "5/22/2020"
-output: html_document
+output:
+  word_document: default
+  html_document: default
 ---
 
 # U.S. Crime Analysis 
 
 In this script, I will analyze the U.S. Crime dataset included in the data folder of this repository. I will use a variety of exploratory and modeling techniques to do so, including, but not limited to:  
 
-  - Outlier Detection
-  - Linear Regression
-  - Principal Component Analysis (PCA) + Lin. Reg.
-  - Regression Trees
-  - Random Forest
-  - Variable Selection
+  - Outlier Detection  
+  - Linear Regression  
+  - Principal Component Analysis (PCA) + Lin. Reg.  
+  - Regression Trees  
+  - Random Forest  
+  - Variable Selection  
   
-```{r}
+Let's start by taking a look at our data:
+
+```{r set up, echo=FALSE}
 #######################################################################
 # Set Up --------------------------------------------------------------
 #######################################################################
@@ -71,7 +75,7 @@ Crime		crime rate: number of offenses per 100,000 population in 1960
 # Outliers
 In this section, we'll first test to see whether there are any outliers in the last column (number of crimes per 100,000 people). To do so, we'll use the grubbs.test function in the outliers package in R.
 
-```{r boxplot}
+```{r boxplot, echo=FALSE}
 
 # First, let's look at a boxplot of the data
 ggplot(data_crime, aes(y = Crime)) +
@@ -94,9 +98,10 @@ ggplot(data_crime, aes(y = Crime)) +
   scale_x_discrete(limits=c("-.1", ".1"))
 
 ```
+
 Now that we have a clear idea of what the outliers could look like, let's use the grubbs.test to better understand these outliers.
 
-```{r Grubbs}
+```{r Grubbs, echo=FALSE}
 
 data_grubbs <- data_crime 
 (grubbs1 <- grubbs.test(data_grubbs$Crime))
@@ -106,12 +111,13 @@ grubbs1$alternative
 (p_value <- grubbs1$p.value) 
 
 ```
+
 Since the p-value is above .05 (.079, to be exact), we cannot say with confidence that there is an outlier in the set. Let's move on to some modelling.
 
 # Linear Regression  
 In the first section, we'll use a simple linear regression model to predict on our crime data. Start by scaling the data so it's standardardized. Avoid column 2 because it's an indicator (factor) for southern states.
 
-```{r lin reg}
+```{r lin reg, echo=FALSE}
 data_scaled <- as_tibble(scale(data_crime[, c(1, 3:16)]))
 
 # bring column 2 back in and reorder our columns
@@ -134,7 +140,7 @@ summary(model_lm1)
 The first two items we should look at are the R-squared value (80.3%) and the Adjusted R-squared value (71.8%). The next item we should look at is the overal p-value, which is p-value: 0.0000003539. This means that our crime data can be explained by the amalgam of predictor variables we provided.
 
 
-```{r lin reg coefs}
+```{r lin reg coefs, echo=FALSE}
 # What do our coefficients look like?
 model_lm1$coefficients
 ```
@@ -143,7 +149,7 @@ As an example of what this means, if M (percentage of males aged 14-24 in total 
 
 But which of the variables mattered and which did not? Well, to start, let's look at the individual p-values for each variable we have. We'll do this by pulling out the p-values and coefficient names.
 
-```{r variable selection}
+```{r variable selection, echo=FALSE}
 p_vals <- summary(model_lm1)$coefficients[,4]
 coefs <- rownames(summary(model_lm1)$coefficients)
 
@@ -181,7 +187,7 @@ ggplot(p_vals_df,
 
 Let's confirm what we see above, especially since U2 seems on the border. Filter our data frame to only show p-values less than .05 and then order our results.
 
-```{r significant variables}
+```{r significant variables, echo=FALSE}
 signif_vars <- p_vals_df %>%
   filter(p_vals < 0.05) %>%
   arrange(p_vals)
@@ -195,7 +201,7 @@ data_signif <- cbind(data_signif, Crime = data_scaled$Crime)
 
 Now that we have the coefficients that matter, let's re-run the linear model only on the coefficients we see above
 
-```{r second lin reg}
+```{r second lin reg, echo=FALSE}
 model_lm2 <- lm(Crime ~ ., data_signif)
 
 summary(model_lm2)
@@ -203,7 +209,7 @@ summary(model_lm2)
 
 We see from this model that our R-squared value dropped significantly. Very strange, and not what I expected. Let's try bringing in the two variables that were just above the .05 threshold (U@ and Po1).
 
-```{r third lin reg}
+```{r third lin reg, echo=FALSE}
 data_updated <- cbind(data_signif, Po1 = data_scaled$Po1)
 
 model_lm3 <- lm(Crime ~., data_updated)
@@ -215,7 +221,7 @@ Great! Our R-squared value went up to 76.6% and our adjusted R-squared went up t
 
 Now, let's predict on a fake dataset given by the original prompt to see what we get.
 
-```{r}
+```{r lin reg 3, echo=FALSE}
 
 # Let's check out our coefficients with the new model
 model_lm3$coefficients
@@ -251,7 +257,7 @@ The linear regression model estimates that the Crime rate based on this data wil
 
 Now let's take a look at the confidence interval for this new data.
 
-```{r}
+```{r, lin reg predictions, echo=FALSE}
 predict(model_lm3, new_data, interval = "confidence")
 ```
 
@@ -262,7 +268,7 @@ The same linear regression model estimates 798 crimes per 100,000 population. It
 
 In this section, I'll apply Principal Component Analysis, a method for trimming down the number of variables in our dataset and for variable selection. This *should* help with model-building later on.
 
-```{r pca prep}
+```{r pca prep, echo=FALSE}
 # Start by getting rid of the Crime column for now since we won't perform
 # PCA on the one column we are aiming to predict.
 base_data <- data_crime %>%
@@ -285,7 +291,7 @@ options(scipen = 999)
 
 Run our first Principle Component Analysis using the prcomp() function which uses Singular value decomposition (SVD), which examines the covariances / correlations between individual observations.
 
-```{r pca1}
+```{r pca1, echo=FALSE}
 # Note: We won't scale the data within the function because we already scaled it earlier.
 (pca1 <- prcomp(base_data, scale. = T))
 
@@ -294,7 +300,7 @@ summary(pca1)
 
 We can see that, from our Cumulative Proportion dimension, the first six principle components explain about 90% of the variation in the data.
 
-```{r pca plot1}
+```{r pca plot1, echo=FALSE}
 
 (ind_plot <- fviz_pca_ind(pca1,
                           # Shade the viz by the quality of representation
@@ -311,7 +317,7 @@ Above is a graph of the individual observations. Individual states with a simila
  - Positively correlated variables point to the same side of the plot.  
  - Negatively correlated variables point to opposite sides of the plot.  
  
-```{r pca plot2}
+```{r pca plot2, echo=FALSE}
 fviz_pca_var(pca1,
              # Shade the viz by the quality of representation
              col.var = "slateblue2", 
@@ -322,12 +328,12 @@ fviz_pca_var(pca1,
 
 
 What are our eigenvalues?
-```{r pca eigen}
+```{r pca eigen, echo=FALSE}
 (pca_eig_val <- get_eigenvalue(pca1))
 ```
 Note that the variance.percent values noted here align with our screeplot above. This also now tells us that 90% of the variance in our data is explained by just 6 dimensions. Let's graph the cumulative variance percentages so it's easier to visualize.
 
-```{r pca plot3}
+```{r pca plot3, echo=FALSE}
 # Before we do so, let's bring the dimension numbers in as a column.
 pca_cum_var <- pca_eig_val %>%
   mutate("dimension" = row.names(pca_eig_val))
@@ -361,7 +367,7 @@ ggplot(pca_cum_var, aes(x = dimension)) +
 
 Just like earlier, we'll bring our crime data (our dependent variable) back in and see how our predictions are using the principle components. 
 
-```{r pca lin reg}
+```{r pca lin reg, echo=FALSE}
 # First, let's limit our data to just the first six principle components, based on
 # our analysis above.
 # Create a variable for the number of coefficients we'll be pulling
@@ -369,7 +375,7 @@ pca_len <- 6
 pca_vals <- pca1$x[, 1:pca_len]
 
 pca_vals <- pca_vals %>%
-  cbind(Crime = data$Crime) %>%
+  cbind(Crime = data_crime$Crime) %>%
   as_tibble()
 
 mod1 <- lm(Crime ~ ., data = pca_vals)
@@ -379,7 +385,8 @@ summary(mod1)
 
 Notice that our adjusted R-squared value is 60.7%. This is significantly lower than what we saw in the previous homework (somewhere around 75-80%), but we've significantly reduced the number of variables we're using.
 
-```{r }
+With that in hand, we'll transform our data back, since PCA performs a linear transformation to our dataset.
+```{r retransform data, echo=FALSE}
 ### Transform our data back
 # Get the original intercept from our model
 b0 <- mod1$coefficients[1]
@@ -407,11 +414,11 @@ orig_b0 <- b0 - sum(rota_matr * mu / std_devs)
 ## Get our original data's formula (coefficients + intercept) such that our model is of the form Y = aX + b
 # Before we get the original formula, let's verify that we are using the correctly-sized objects for this. This is important
 # for matrix multiplication
-if ( dim(data[, 1:15])[2] == dim(orig_coefs)[1] ) {
-  "Great work. Let's keep on going."
-} else {
-  "Hold on. Something seems wrong."
-}
+# if ( dim(data[, 1:15])[2] == dim(orig_coefs)[1] ) {
+#   "Great work. Let's keep on going."
+# } else {
+#   "Hold on. Something seems wrong."
+# }
 
 estimates <- as.matrix(data[, 1:15]) %*% orig_coefs + orig_b0
 
@@ -422,7 +429,7 @@ The estimates represent what the PCA model expects our crime data to be based on
 
 As we did earlier, now, let's predict on the dataset we've been provided. First we'll store all the new data we've been provided into a data frame.
 
-```{r}
+```{r, echo=FALSE}
 M = 14.0
 So = 0
 Ed = 10.0
@@ -446,22 +453,22 @@ new_data <- data.frame(M = M, So = So, Ed = Ed, Po1 = Po1, Po2 = Po2,
 
 
 # Convert the new state data using the PCA we found earlier so we can apply our model.
-new_pca <- data.frame(predict(pca1, new_data)) 
+(new_pca <- data.frame(predict(pca1, new_data)))
 ```
 
 So where does this new "state" fit? We'll use the graph we saw earlier and add this new point, manipulated utilizing our PCA, as a red dot on the graph.
 
-```{r pca plot4}
+```{r pca plot4, echo=FALSE}
 fviz_add(ind_plot, new_pca, color ="red")
 ```
 
 Now we'll predict what the crime rate would now be by leveraging the new data that's had PCA applied.
 
-```{r pca predict}
+```{r pca predict, echo=FALSE}
 (pred <- predict(mod1, newdata = new_pca))
 ```
 
-Thus we predict that the crime rate in the new state would be 1248 crimes per 100,000 population. This seems within the range of reason for our data, especially given that the mean of our crime data is **`r mean(data$Crime)`** and the range goes from **`r range(data$Crime)[1]`** to **`r range(data$Crime)[2]`**.  
+Thus we predict that the crime rate in the new state would be 1248 crimes per 100,000 population. This seems within the range of reason for our data, especially given that the mean of our crime data is **`r mean(data_crime$Crime)`** and the range goes from **`r range(data_crime$Crime)[1]`** to **`r range(data_crime$Crime)[2]`**.  
 
 
 # Decision Trees
@@ -469,7 +476,7 @@ In this section, I'll find the best model available using:
   - Regression Trees
   - Random Forest
   
-```{r decision trees}
+```{r decision trees, echo=FALSE}
 # Change column 2 to be a factor
 data_scaled_facs <- as.data.frame(as.factor(unlist(data_crime[, 2])))
 
@@ -482,14 +489,11 @@ data_scaled_fix <- data_scaled %>%
 ```
 
 ## Regression Tree  
-Recursive partitioning is a fundamental tool in data mining. It helps us explore the
-stucture of a set of data, while developing easy to visualize decision rules for predicting
-a categorical (classification tree) or continuous (regression tree) outcome.
-Our formula	below will be in the format outcome ~ ., which allows us to predict on all of our variables.
+Recursive partitioning is a fundamental tool in data mining. It helps us explore the stucture of a set of data, while developing easy to visualize decision rules for predicting a categorical (classification tree) or continuous (regression tree) outcome. Our formula	below will be in the format outcome ~ ., which allows us to predict on all of our variables.  
 
 We'll grow our tree using the rpart function from the rpart package to create our regression tree.
 
-```{r rpart}
+```{r rpart, echo=FALSE}
 reg_tree <- rpart(Crime ~ ., 
                   data = data_scaled_fix, # specifies the data frame (we'll use our scaled data so everything's on equal footing)  
                   method = "anova") # "anova" for a regression tree*
@@ -507,7 +511,7 @@ Immediately, we see that our four most important variables in this tree model ar
  3. Wealth (median value of transferable assets or family income)  
  4. Ineq (percentage of families earning below half the median income)  
  
-```{r decision tree analysis}
+```{r decision tree analysis, echo=FALSE}
  # display complexity parameter table
 (cp <- reg_tree$cptable)
 plotcp(reg_tree)	
@@ -517,7 +521,7 @@ plotcp(reg_tree)
 
 Notice from the graph of the relative errors, that our best split occurs when cp = 4, which is where the lowest cross valiadation error occurs. This means that the optimal number of splits for our tree is 4. This value occurs at cp = **`r cp[which.min(cp[, 3]), 1]`**.
 
-```{r}
+```{r, echo=FALSE}
 # plot approximate R-squared and relative error for different splits (2 plots).
 rsq.rpart(reg_tree)	
 
@@ -529,7 +533,7 @@ From the visualization of the regression tree above, we can see that Po1 is the 
 
 ## Random Forest  
 Now we'll compare our results to those we get from running a Random Forest model. The Random Forest model will make 500 decision trees and "vote" on the nodes that work best (i.e. provide the highest accuracy).
-```{r random forest}
+```{r random forest, echo=FALSE}
 rf_mod <- randomForest(Crime ~ ., data = data_scaled_fix)
 
 print(rf_mod)
@@ -539,7 +543,7 @@ Here we note that the mean of the squared residuals is **`r last(rf_mod$mse)`**.
 
 Which variables were the most important according to the Random Forest algorithm?
 
-```{r}
+```{r, echo=FALSE}
 # Start by bringing everything together into one data frame and rename the columns
 rf_imprtnce <- cbind(row.names(rf_mod$importance), rf_mod$importance)
 colnames(rf_imprtnce) <- c("Variable", "Importance")
@@ -584,7 +588,7 @@ see if our accuracy improves.
 ## Stepwise Regression   
 First we'll find the full linear regression model and then run Stepwise Regression, in which we'll slowly pick apart the full model by slicing out negligible coefficients.
 
-```{r}
+```{r, echo=FALSE}
 # Using the linear regression model we created earlier, fit a stepwise regression model
 step_mod <- stepAIC(model_lm1, direction = "both", trace = FALSE)
 
@@ -595,7 +599,7 @@ This puts our R-squared value around 74% and p-value close to 0
 
 Next we'll use the caret package -- specifically the leaps and the MASS packages to fit our linear regression model using stepwise selection (leapSeq). Set up repeated 10-fold cross-validation, which will let us estimate the RMSE (average prediction error) for each of the 5 models specified by nvmax.
 
-```{r stepwise}
+```{r stepwise, echo=FALSE}
 train_control <- trainControl(method = "cv", number = 10)
 # Train the model
 step_mod <- train(Crime ~ ., data = data_crime,
@@ -638,7 +642,7 @@ geom_col(fill = "slateblue2") +
 
 
 Our final model and coefficients are:
-```{r stepwise results}
+```{r stepwise results, echo=FALSE}
 summary(step_mod$finalModel)
 coef(step_mod$finalModel, 3)
 ```
@@ -650,7 +654,7 @@ An asterisk indicates that a given variable is going to be included in our final
  3. Ineq (income inequality: percentage of families earning below half the median income)  
 
 Thus our final model becomes:  
-```{r final stepwise}
+```{r final stepwise, echo=FALSE}
 cat("Crime = ", coef(step_mod$finalModel, 3)[1], "+ (Ed x ", coef(step_mod$finalModel, 3)[2], ") + (Po1 x ", coef(step_mod$finalModel, 3)[3], ") + (Ineq x ", coef(step_mod$finalModel, 3)[4], ")", sep = "")
 ```
   
@@ -658,7 +662,7 @@ cat("Crime = ", coef(step_mod$finalModel, 3)[1], "+ (Ed x ", coef(step_mod$final
 ## Lasso and Elastic-Net Regression   
 After doing some research, I found that both variable selection methods use the same glmnet() functions. The only difference is an input parameter, denoted 'alpha', which differs between the two. So we'll just look at them simultaneously, along with a number of other variations of alpha values.
 
-```{r lasso}
+```{r lasso, echo=FALSE}
 # Super annoying but glmnet prefers data.matrix instead of as.matrix
 x <- data.matrix(data_scaled_fix[, -16])
 y <- data.matrix(data_scaled_fix[, 16])
@@ -718,7 +722,7 @@ cat("From above, we can see that an alpha value of ", full_df$a_vals[which.min(f
 ### Find our Model   
 Now that we know which alpha value gives us the lowest Mean Squared Error, we'll pull that model out and treat that as our linear regression model.
 
-```{r elastic net}
+```{r elastic net, echo=FALSE}
 # Store our min alpha value as a variable
 min_alpha <- full_df$a_vals[which.min(full_df$mse)]
 # Next we'll run the cv.glmnet function on our optimal alpha value of .1
@@ -726,23 +730,23 @@ alphafit_optimal <- cv.glmnet(x, y, type.measure = "mse", alpha = min_alpha, nfo
 ```
 
 Find the alpha value's lambda.1se, which is the largest value of lambda such that error is within 1 standard error of the minimum.
-```{r lambda}
+```{r lambda, echo=FALSE}
 (lambda <- alphafit_optimal$lambda.1se)
 ```
 
 Run our prediction on our model. Note that s probably refers to the size of the penalty we are setting.
-```{r }
+```{r var select predict, echo=FALSE}
 (prediction <- predict(alphafit_optimal, s = lambda, newx = x))
 ```
 
 Get our mean squared error
-```{r mse}
+```{r mse, echo=FALSE}
 (mse <- mean((y - prediction)^2))
 ```
 
 Now that we have our glmnet conducted, we'll figure out which coefficients we need so we can build out our linear regression model.
 
-```{r var selection}
+```{r var selection, echo=FALSE}
 # Find the coefficients that are most important
 coefs <- coef(alphafit_optimal, s = lambda)
 
